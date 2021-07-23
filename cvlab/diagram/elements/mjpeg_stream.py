@@ -114,6 +114,10 @@ class MjpegStreamServer(NormalElement):
     server = None
     type = 0
 
+    def __init__(self):
+        super().__init__()
+        pass
+
     def stop(self):
         videoThread = Thread(target=self.shutdown)
         videoThread.start()
@@ -166,6 +170,10 @@ class MjpegStreamServer(NormalElement):
                 output.write(buf.tobytes())
             outputs['dst'] = inputs['src']
         pass
+
+    def __del__(self):
+
+        super(MjpegStreamServer, self).__del__()
 
 
 register_elements(__name__, [MjpegStreamServer])
