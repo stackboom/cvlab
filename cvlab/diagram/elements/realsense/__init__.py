@@ -1,5 +1,7 @@
 # import importlib.util
 # rs = importlib.util.find_spec("pyrealsense2")
+import math
+import time
 from threading import Event
 from datetime import datetime, timedelta
 
@@ -57,6 +59,7 @@ class RSStandard(InputElement):
             Output("color"),
             Output("depth")
         ], [
+            FloatParameter("fps", value=15, min_=0.1, max_=120),
             ButtonParameter("pause", self.playpause, "Play / Pause")
         ]
 
@@ -72,6 +75,10 @@ class RSStandard(InputElement):
         for name, parameter in self.parameters.items():
             parameters[name] = parameter.get()
 
+        if self.actual_parameters["fps"] != parameters["fps"]:
+            self.actual_parameters["fps"] = parameters["fps"]
+            self.may_interrupt()
+
         if not self.outputs["color"].get():
             color_output = Data()
             self.outputs["color"].put(color_output)
@@ -84,11 +91,17 @@ class RSStandard(InputElement):
         else:
             depth_output = self.outputs["depth"].get()
 
-
         while True:
             self.may_interrupt()
             now = datetime.now()
+            if now - self.last_frame_time < timedelta(seconds=1.0/parameters["fps"]):
+                seconds_to_wait = 1.0/parameters["fps"] - (now-self.last_frame_time).total_seconds()
+                breaks = int(round(seconds_to_wait*10+1))
+                for _ in range(breaks):
+                    time.sleep(seconds_to_wait/breaks)
+                    self.may_interrupt()
             self.last_frame_time = datetime.now()
+            self.may_interrupt()
             self.set_state(Element.STATE_BUSY)
 
             # Get frameset of color and depth
@@ -101,6 +114,8 @@ class RSStandard(InputElement):
             # Get aligned frames
             aligned_depth_frame = aligned_frames.get_depth_frame() # aligned_depth_frame is a 640x480 depth image
             color_frame = aligned_frames.get_color_frame()
+
+            self.may_interrupt()
 
             # Validate that both frames are valid
             if not aligned_depth_frame or not color_frame:
